@@ -1,0 +1,17 @@
+{
+  "name": "Doc Tracker",
+  "short_name": "Doc Tracker",
+  "description": "Track documents and their expiry dates, with reminders before they run out. / Dokumenty i terminy ważności z przypomnieniami.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F0F2F8",
+  "theme_color": "#F0F2F8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

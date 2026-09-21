@@ -1,0 +1,1295 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Doc Tracker</title>
+<meta name="description" content="Track documents and their expiry dates, with reminders before they run out.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F0F2F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1424" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#F0F2F8;
+  --surface:#FFFFFF;
+  --ink:#1A2033;
+  --muted:#5B6580;
+  --line:#DADFEC;
+  --ring:#8C97B5;
+  --ok:#0A7360;
+  --ok-bg:#E1F2EE;
+  --warn:#8F5200;
+  --warn-bar:#E39A12;
+  --warn-bg:#FFF1D6;
+  --bad:#B42A22;
+  --bad-bg:#FBE4E1;
+  --info:#2B55C9;
+  --info-bg:#E4EBFC;
+  --link:#3550D6;
+  --toast-action:#8FA6FF;
+  --kid:#3550D6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F1424;
+    --surface:#171E33;
+    --ink:#E8ECF7;
+    --muted:#98A3C0;
+    --line:#293250;
+    --ring:#65719A;
+    --ok:#3CCBA8;
+    --ok-bg:#123229;
+    --warn:#F2C065;
+    --warn-bar:#F2C065;
+    --warn-bg:#3A2D10;
+    --bad:#FF8A80;
+    --bad-bg:#3C1B19;
+    --info:#8FB0FF;
+    --info-bg:#1B2A55;
+    --link:#8EA2FF;
+    --toast-action:#3550D6;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+[hidden]{display:none !important}
+body{
+  background:var(--bg);color:var(--ink);
+  font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--link);outline-offset:2px}
+
+.wrap{
+  max-width:560px;margin:0 auto;
+  padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(130px + env(safe-area-inset-bottom,0px));
+}
+
+/* header */
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.when{color:var(--muted);font-size:15px;font-weight:600}
+h1{margin:6px 0 0;font-size:clamp(32px,10vw,40px);line-height:1.05;font-weight:800;letter-spacing:-.03em}
+.tools{display:flex;gap:4px;flex:none}
+.iconbtn{
+  width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
+  background:var(--surface);display:grid;place-items:center;padding:0;flex:none;
+}
+.iconbtn svg{width:22px;height:22px}
+.linkbtn{background:none;border:0;padding:4px 0;min-height:32px;font-size:14px;font-weight:700;color:var(--link)}
+
+/* summary */
+.card{
+  position:relative;overflow:hidden;margin-top:16px;padding:16px;background:var(--surface);
+  border:1px solid var(--line);border-radius:22px;
+}
+.card h2{margin:0;font-size:20px;line-height:1.25;font-weight:750;letter-spacing:-.01em}
+.card h2.attn{color:var(--warn)}
+.card h2.good{color:var(--ok)}
+.card .note{margin:4px 0 0;color:var(--muted);font-size:14px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.tile{
+  display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:10px 12px;border-radius:16px;
+  background:var(--bg);border:1.5px solid transparent;text-align:left;
+}
+.tile b{font-size:26px;line-height:1.1;font-weight:800;font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;font-weight:650;color:var(--muted)}
+.tile.t-expired b{color:var(--bad)}
+.tile.t-soon b{color:var(--warn)}
+.tile.t-ok b{color:var(--ok)}
+.tile[aria-pressed="true"]{border-color:var(--ink);background:var(--surface)}
+
+/* controls */
+.search{
+  width:100%;height:46px;margin-top:14px;padding:0 14px;border-radius:14px;border:1.5px solid var(--line);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:16px;
+}
+.kids{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:4px 16px 8px;scrollbar-width:none}
+.kids::-webkit-scrollbar{display:none}
+.kidchip{
+  position:relative;flex:none;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 16px 0 5px;
+  border-radius:22px;background:var(--surface);border:1.5px solid var(--line);font-weight:700;
+}
+.kidchip .avatar{width:34px;height:34px;font-size:15px}
+.kidchip[aria-selected="true"]{background:var(--kid);border-color:var(--kid);color:#fff}
+.kidchip[aria-selected="true"] .avatar{background:#fff;color:var(--kid)}
+.kidchip.allchip{padding:0 16px}
+.kidchip.allchip[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.kidchip .duedot{position:absolute;top:-2px;right:-2px;width:14px;height:14px;border-radius:50%;background:var(--warn-bar);border:2px solid var(--bg)}
+.avatar{
+  width:48px;height:48px;border-radius:50%;background:var(--kid);color:#fff;flex:none;
+  display:grid;place-items:center;font-weight:800;font-size:20px;
+}
+.groupby{display:flex;align-items:center;gap:10px;margin-top:6px}
+.groupby > span{font-size:13px;font-weight:700;color:var(--muted);flex:none}
+.groupby .seg3{margin:0;flex:1}
+.groupby .seg3 span{min-height:38px;font-size:14px}
+
+/* document list */
+.grouphead{margin:22px 4px 8px;font-size:14px;font-weight:700;color:var(--muted);display:flex;gap:8px;align-items:baseline}
+.grouphead.g-expired{color:var(--bad)}
+.grouphead.g-soon{color:var(--warn)}
+.group{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.row{border-top:1px solid var(--line);box-shadow:inset 5px 0 0 var(--sc,var(--ring))}
+.row:first-child{border-top:0}
+.st-expired{--sc:var(--bad)}
+.st-soon{--sc:var(--warn-bar)}
+.st-progress{--sc:var(--info)}
+.st-ok{--sc:var(--ok)}
+.st-none{--sc:var(--ring)}
+.rowbtn{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;
+  min-height:72px;padding:12px 16px 12px 20px;background:none;border:0;text-align:left;
+}
+.name{font-size:17px;font-weight:700;overflow-wrap:anywhere}
+.tags{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;margin-top:2px}
+.tag{font-size:13px;color:var(--muted)}
+.owner{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--ink)}
+.owner i{width:10px;height:10px;border-radius:50%;background:var(--kid);display:inline-block}
+.side{text-align:right;white-space:nowrap}
+.rel{font-weight:800;font-size:15px}
+.st-expired .rel{color:var(--bad)}
+.st-soon .rel{color:var(--warn)}
+.st-progress .rel{color:var(--info)}
+.st-ok .rel{color:var(--ok)}
+.st-none .rel{color:var(--muted)}
+.dt{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.badge{display:inline-block;margin-top:2px;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:800;background:var(--info-bg);color:var(--info)}
+
+.empty{text-align:center;padding:36px 12px 8px}
+.empty h2{margin:0 0 6px;font-size:22px;font-weight:750}
+.empty p{margin:0 auto 18px;max-width:34ch;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{min-height:44px;padding:0 16px;border-radius:22px;background:var(--surface);border:1px solid var(--line);font-weight:650}
+.archived{margin-top:26px}
+
+.add{
+  position:fixed;left:0;right:0;margin:0 auto;width:max-content;
+  bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  height:56px;padding:0 24px 0 18px;border:0;border-radius:28px;white-space:nowrap;
+  display:flex;align-items:center;gap:8px;font-weight:750;
+  background:var(--ink);color:var(--bg);box-shadow:0 8px 22px rgba(10,16,36,.28);z-index:10;
+}
+.add svg{width:22px;height:22px}
+
+/* sheets */
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(9,13,28,.55);display:flex;align-items:flex-end;justify-content:center}
+.sheet{
+  width:100%;max-width:560px;max-height:92vh;overflow:auto;background:var(--surface);
+  border-radius:24px 24px 0 0;padding:10px 20px calc(20px + env(safe-area-inset-bottom,0px));
+  animation:up .2s ease-out;
+}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.sheet h2{margin:0 0 4px;font-size:21px;font-weight:750;letter-spacing:-.01em;overflow-wrap:anywhere}
+.sheet .sub2{margin:0 0 14px;color:var(--muted);font-size:15px}
+.field{display:block;margin-bottom:14px}
+.lbl{display:block;font-size:14px;font-weight:650;margin-bottom:6px}
+.lbl .opt{color:var(--muted);font-weight:500}
+.hint{margin:0 0 10px;color:var(--muted);font-size:13px}
+input[type=text],input[type=number],input[type=date],input[type=url]{
+  width:100%;height:48px;padding:0 14px;border-radius:12px;border:1.5px solid var(--line);
+  background:var(--bg);color:var(--ink);font:inherit;font-size:16px;
+}
+textarea{
+  width:100%;min-height:76px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);
+  background:var(--bg);color:var(--ink);font:inherit;font-size:16px;resize:vertical;
+}
+input:focus,textarea:focus{border-color:var(--link)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.seg3.two{grid-template-columns:1fr 1fr}
+.seg3 label{position:relative;display:block}
+.seg3 input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.seg3 span{
+  display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 6px;
+  border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-weight:650;font-size:15px;text-align:center;
+}
+.seg3 input:checked+span{border-color:transparent;background:var(--ink);color:var(--bg)}
+.seg3 input:focus-visible+span,.pickchip input:focus-visible+span{outline:3px solid var(--link);outline-offset:2px}
+.pickchips{display:flex;flex-wrap:wrap;gap:8px}
+.pickchip{position:relative;display:block}
+.pickchip input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.pickchip span{
+  display:flex;align-items:center;min-height:44px;padding:0 15px;border-radius:22px;
+  border:1.5px solid var(--line);background:var(--bg);font-weight:650;font-size:15px;
+}
+.pickchip input:checked+span{background:var(--ink);color:var(--bg);border-color:transparent}
+.customrow{display:grid;grid-template-columns:90px 1fr auto;gap:8px;align-items:start;margin-top:12px}
+.customrow .seg3{margin:0}
+.customrow .seg3 span{min-height:48px;font-size:13px}
+.customrow .btn{width:auto;padding:0 16px}
+.tplrow{display:flex;gap:8px;overflow-x:auto;margin:0 -20px 14px;padding:2px 20px 6px;scrollbar-width:none}
+.tplrow::-webkit-scrollbar{display:none}
+.tplrow .chip{flex:none;min-height:40px;padding:0 14px;font-size:14px;background:var(--bg)}
+
+.switchrow{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:8px 0}
+.switchrow b{font-weight:650}
+.switchrow small{display:block;color:var(--muted);font-size:13px}
+input.switch{
+  -webkit-appearance:none;appearance:none;flex:none;position:relative;margin:0;
+  width:52px;height:32px;border-radius:16px;border:0;background:var(--ring);transition:background .15s;
+}
+input.switch::after{
+  content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;
+  background:#fff;transition:transform .15s;
+}
+input.switch:checked{background:var(--link)}
+input.switch:checked::after{transform:translateX(20px)}
+details{margin:2px 0 14px;border:1.5px solid var(--line);border-radius:14px;padding:0 14px}
+summary{min-height:48px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+details[open] summary{margin-bottom:4px}
+.btnrow{display:grid;gap:10px}
+.btn{
+  min-height:50px;width:100%;padding:0 18px;border-radius:14px;border:0;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.btn small{font-size:13px;font-weight:500;opacity:.85}
+.btn.primary{background:var(--link);color:#fff}
+.btn.ok{background:var(--ok);color:#fff}
+.btn.ghost{background:transparent;border:1.5px solid var(--line)}
+.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.extras{margin-top:14px;padding-top:6px;border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:stretch}
+.textbtn{background:none;border:0;min-height:46px;padding:8px 4px;text-align:left;font-weight:650}
+.textbtn.dangertext{color:var(--bad)}
+.section{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.section h3{margin:0 0 10px;font-size:15px;font-weight:700}
+.section p{margin:0 0 12px;color:var(--muted);font-size:14px}
+.notice{padding:12px 14px;border-radius:14px;background:var(--warn-bg);color:var(--warn);font-size:14px;font-weight:600}
+.notice b{display:block;margin-bottom:2px}
+.vis{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* detail sheet */
+.pillst{display:inline-block;margin:0 0 12px;padding:3px 12px;border-radius:999px;font-size:13px;font-weight:800}
+.pillst.st-expired{background:var(--bad-bg);color:var(--bad)}
+.pillst.st-soon{background:var(--warn-bg);color:var(--warn)}
+.pillst.st-progress{background:var(--info-bg);color:var(--info)}
+.pillst.st-ok{background:var(--ok-bg);color:var(--ok)}
+.pillst.st-none{background:var(--bg);color:var(--muted)}
+.kv{margin:0 0 6px}
+.kv div{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.kv div:first-child{border-top:0}
+.kv dt{font-size:13px;font-weight:700;color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.kv a{color:var(--link);font-weight:650}
+.rlist{list-style:none;margin:0 0 6px;padding:0}
+.rlist li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:15px}
+.rlist li:first-child{border-top:0}
+.rlist .past{color:var(--muted)}
+.rlist .past b{color:var(--ok)}
+.detailbtns{margin-top:14px}
+
+.toast{
+  position:fixed;left:0;right:0;margin:0 auto;width:max-content;z-index:30;
+  bottom:calc(88px + env(safe-area-inset-bottom,0px));
+  max-width:calc(100% - 32px);display:flex;align-items:center;gap:14px;
+  padding:12px 14px 12px 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:15px;
+  box-shadow:0 8px 22px rgba(10,16,36,.3);
+}
+.toast button{background:none;border:0;padding:6px 4px;min-height:36px;font-weight:800;color:var(--toast-action)}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important;transition:none !important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="bar">
+      <div class="when" id="dateText"></div>
+      <div class="tools">
+        <button class="iconbtn" id="calBtn" type="button"></button>
+        <button class="iconbtn" id="settingsBtn" type="button"></button>
+      </div>
+    </div>
+    <h1 id="title"></h1>
+  </header>
+  <section id="summary" aria-live="polite"></section>
+  <section id="controls"></section>
+  <main id="list"></main>
+  <section class="archived" id="archived"></section>
+</div>
+<button class="add" id="addBtn" type="button"></button>
+<div id="sheetRoot"></div>
+<div id="toastRoot" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- helpers ---------- */
+  var KEY = 'docTracker.v1';
+  var CATS = ['id', 'vehicle', 'insurance', 'health', 'home', 'work', 'other'];
+  var PRESET_LEADS = ['7d', '14d', '1m', '2m', '3m', '4m', '5m', '6m', '9m', '12m'];
+  var COLORS = ['#3550D6', '#7B4BD1', '#C93585', '#BD5A0B', '#1B8552', '#0B7F8F'];
+  var STATUS_ORDER = ['expired', 'soon', 'progress', 'ok', 'none'];
+  var $ = function (s) { return document.querySelector(s); };
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+
+  var ICON = {
+    plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
+    tune: '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M20 7h0M4 12h4M14 12h6M4 17h10M20 17h0"/><circle cx="17" cy="7" r="2.2"/><circle cx="11" cy="12" r="2.2"/><circle cx="17" cy="17" r="2.2"/></g></svg>',
+    cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></g></svg>'
+  };
+
+  // tiny DOM builder (uses textContent, so anything typed by the user can never inject HTML)
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        var v = attrs[k];
+        if (v == null || v === false) return;
+        if (k === 'class') el.className = v;
+        else if (k === 'html') el.innerHTML = v;
+        else if (k === 'value' || k === 'checked' || k === 'hidden') el[k] = v;
+        else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+        else el.setAttribute(k, v === true ? '' : v);
+      });
+    }
+    for (var i = 2; i < arguments.length; i++) append(el, arguments[i]);
+    return el;
+  }
+  function append(el, kid) {
+    if (kid == null || kid === false) return;
+    if (Array.isArray(kid)) { kid.forEach(function (k) { append(el, k); }); return; }
+    el.appendChild(typeof kid === 'string' || typeof kid === 'number' ? document.createTextNode(String(kid)) : kid);
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function plural(n, f) {   // Polish: one / few / many
+    var m10 = n % 10, m100 = n % 100;
+    return n === 1 ? f[0] : (m10 >= 2 && m10 <= 4 && !(m100 >= 12 && m100 <= 14)) ? f[1] : f[2];
+  }
+
+  /* ---------- text (Polish / English) ---------- */
+  var T = {
+    pl: {
+      appName: 'Doc Tracker', title: 'Dokumenty', addDoc: 'Dodaj dokument', calAll: 'Dodaj terminy do kalendarza',
+      search: 'Szukaj', searchPh: 'Szukaj dokumentu…',
+      headOk: 'Wszystko jest aktualne.',
+      headAttn: function (n) { return n + ' ' + plural(n, ['dokument wymaga', 'dokumenty wymagają', 'dokumentów wymaga']) + ' uwagi'; },
+      inProgress: function (n) { return 'Odnowienie w toku: ' + n; },
+      tExpired: 'Po terminie', tSoon: 'Do odnowienia', tOk: 'Ważne',
+      allPeople: 'Wszyscy', general: 'Ogólne', peopleNav: 'Osoby',
+      groupBy: 'Grupuj', gUrgency: 'Termin', gPerson: 'Osoba', gType: 'Rodzaj',
+      h_expired: 'Po terminie', h_soon: 'Do odnowienia', h_progress: 'Odnowienie w toku', h_ok: 'Ważne', h_none: 'Bez terminu ważności',
+      tplTitle: 'Szybkie dodawanie',
+      tpl_passport: 'Paszport', tpl_idcard: 'Dowód osobisty', tpl_driving: 'Prawo jazdy', tpl_visa: 'Wiza lub karta pobytu',
+      tpl_carins: 'Ubezpieczenie OC', tpl_carinsp: 'Przegląd techniczny', tpl_healthins: 'Ubezpieczenie zdrowotne',
+      tpl_homeins: 'Ubezpieczenie mieszkania', tpl_school: 'Legitymacja szkolna', tpl_member: 'Karnet lub członkostwo',
+      c_id: 'Tożsamość i podróże', c_vehicle: 'Pojazd', c_insurance: 'Ubezpieczenia', c_health: 'Zdrowie', c_home: 'Dom', c_work: 'Praca i szkoła', c_other: 'Inne',
+      emptyTitle: 'Jeszcze nie ma dokumentów',
+      emptyText: 'Dodaj paszport, dowody, ubezpieczenia i inne. Dostaniesz przypomnienie, zanim stracą ważność.',
+      noMatch: 'Nic nie pasuje do wyszukiwania lub filtrów.', clearFilters: 'Wyczyść filtry',
+      newDoc: 'Nowy dokument', editDoc: 'Edytuj dokument', docTitle: 'Dokument', docTitlePh: 'np. Paszport',
+      owner: 'Czyj to dokument', ownerPh: 'np. Ola (albo zostaw puste)', category: 'Rodzaj',
+      expiry: 'Data ważności', noExpiry: 'Bez daty ważności', noExpiryHint: 'Dla dokumentów, które nie tracą ważności. Przypomnienia nie są potrzebne.',
+      issued: 'Data wydania', remindersLbl: 'Przypomnij mi przed końcem ważności', remindersHint: 'Wybierz tyle, ile chcesz.',
+      customLbl: 'Inny czas', unitDays: 'dni', unitWeeks: 'tyg.', unitMonths: 'mies.', addCustom: 'Dodaj',
+      more: 'Więcej szczegółów', number: 'Numer dokumentu', location: 'Gdzie leży', locationPh: 'np. szuflada w przedpokoju',
+      url: 'Link', urlPh: 'np. strona do odnowienia', notes: 'Notatki', optional: ' (opcjonalnie)',
+      needTitle: 'Wpisz nazwę dokumentu', needExpiry: 'Wybierz datę ważności', badUrl: 'Link powinien zaczynać się od http:// lub https://',
+      badCustom: 'Wpisz liczbę od 1 do 36 (miesiące) lub do 365 (dni)',
+      addBtn: 'Dodaj', save: 'Zapisz zmiany', cancel: 'Anuluj', close: 'Zamknij', undo: 'Cofnij',
+      lExpires: 'Ważny do', lIssued: 'Wydany', lNumber: 'Numer', lLocation: 'Gdzie leży', lLink: 'Link', lNotes: 'Notatki',
+      remHead: 'Przypomnienia', before: 'przed',
+      histHead: 'Wcześniejsza ważność',
+      histLine: function (exp, on) { return 'Ważny do ' + exp + ' (odnowiony ' + on + ')'; },
+      passedLbl: 'minął',
+      renewed: 'Odnowione', renewStart: 'Odnowienie rozpoczęte', renewStartOff: 'Cofnij „odnowienie rozpoczęte”',
+      addCal: 'Dodaj do kalendarza', edit: 'Edytuj', archive: 'Przenieś do archiwum', del: 'Usuń', restore: 'Przywróć',
+      renewTitle: function (x) { return 'Odnowiono: ' + x; }, renewSub: 'Wpisz nową datę ważności.',
+      newExpiry: 'Nowa data ważności', newNumber: 'Nowy numer dokumentu', saveRenew: 'Zapisz',
+      archivedHead: function (n) { return 'Archiwum: ' + n; }, showArch: 'Pokaż archiwum', hideArch: 'Ukryj archiwum',
+      st_expired: 'Po terminie', st_soon: 'Do odnowienia', st_progress: 'Odnowienie w toku', st_ok: 'Ważny', st_none: 'Bez terminu',
+      tAdded: function (x) { return 'Dodano: „' + x + '”'; }, tSaved: 'Zapisano zmiany',
+      tRenewed: function (x) { return 'Odnowiono: „' + x + '”'; }, tArchived: function (x) { return 'W archiwum: „' + x + '”'; },
+      tRestored: function (x) { return 'Przywrócono: „' + x + '”'; }, tDeleted: function (x) { return 'Usunięto: „' + x + '”'; },
+      tProgress: 'Zaznaczono: odnowienie rozpoczęte', tProgressOff: 'Przypomnienia znów włączone',
+      tCal: 'Plik kalendarza gotowy', tNoDates: 'Brak nadchodzących terminów do dodania',
+      tSaveFail: 'Nie udało się zapisać. Pamięć może być pełna lub zablokowana.',
+      aOpen: 'Otwórz: ', aShow: 'Pokaż: ', aFilter: 'Filtruj: ',
+      settingsTitle: 'Ustawienia', language: 'Język',
+      defTitle: 'Domyślne przypomnienia', defText: 'Ustawiane dla każdego nowego dokumentu.',
+      calTitle: 'Kalendarz', calText: 'Dodaje każdy termin ważności i każde przypomnienie do kalendarza w telefonie. Kalendarz przypomni Ci nawet wtedy, gdy ta aplikacja jest zamknięta.',
+      calBtn: 'Dodaj wszystko do kalendarza',
+      bgTitle: 'Przypomnienia przy zamkniętej aplikacji', bgToggle: 'Sprawdzaj w tle (tylko Chrome)',
+      bgHint: 'Chrome sprawdza terminy co jakiś czas w tle i może pokazać powiadomienie. Nie jest to gwarantowane.',
+      bgActive: 'Sprawdzanie w tle jest włączone.', bgNeedInstall: 'Dostępne po zainstalowaniu aplikacji z Chrome.',
+      bgUnsupported: 'Ta przeglądarka nie obsługuje sprawdzania w tle.', bgDenied: 'Sprawdzanie w tle jest zablokowane w ustawieniach.',
+      notifAsk: 'Zezwól na powiadomienia', notifAllowed: 'Powiadomienia są włączone.', notifBlocked: 'Powiadomienia są zablokowane w ustawieniach przeglądarki.',
+      notifNone: 'Ta przeglądarka nie obsługuje powiadomień.',
+      limitsTitle: 'Ważne',
+      limitsText: 'Aplikacje internetowe na Androidzie nie mogą dzwonić ani wysyłać powiadomień o umówionej porze, gdy są zamknięte. Najpewniejsze są przypomnienia w kalendarzu telefonu, więc dodaj tam terminy.',
+      install: 'Instalacja', installText: 'Dodaj aplikację do ekranu głównego, żeby otwierała się jak zwykła aplikacja.',
+      installBtn: 'Zainstaluj na tym telefonie', installed: 'Zainstalowano na tym telefonie',
+      backup: 'Kopia zapasowa',
+      backupText: 'Dane są tylko na tym telefonie. Od czasu do czasu zapisz plik kopii, żeby móc je odzyskać, gdyby dane aplikacji zostały wyczyszczone.',
+      saveBackup: 'Zapisz plik kopii', restore: 'Przywróć z pliku kopii', backupDone: 'Kopia zapasowa pobrana',
+      erase: 'Usuwanie', eraseBtn: 'Usuń wszystkie dane…', eraseTitle: 'Usunąć wszystkie dane?',
+      eraseText: 'To usunie wszystkie dokumenty z tego telefonu. Jeśli możesz ich jeszcze potrzebować, najpierw zapisz kopię.',
+      eraseGo: 'Usuń wszystko', erased: 'Wszystkie dane usunięte',
+      restoreTitle: 'Przywrócić kopię?',
+      restoreText: function (n) { return 'Dokumenty w kopii: ' + n + '. To zastąpi dane na tym telefonie.'; },
+      restoreGo: 'Zastąp danymi z kopii', restored: 'Kopia przywrócona',
+      badFile: 'To nie jest plik kopii tej aplikacji.', readFail: 'Nie można odczytać pliku.',
+      today: 'dziś', tomorrow: 'jutro', yesterday: 'wczoraj',
+      inDays: function (n) { return 'za ' + n + ' dni'; }, inMonths: function (n) { return 'za ' + n + ' ' + plural(n, ['miesiąc', 'miesiące', 'miesięcy']); },
+      inYears: function (n) { return 'za ' + n + ' ' + plural(n, ['rok', 'lata', 'lat']); },
+      agoDays: function (n) { return n + ' dni temu'; }, agoMonths: function (n) { return n + ' ' + plural(n, ['miesiąc', 'miesiące', 'miesięcy']) + ' temu'; },
+      agoYears: function (n) { return n + ' ' + plural(n, ['rok', 'lata', 'lat']) + ' temu'; },
+      leadD: function (n) { return n === 1 ? '1 dzień' : n + ' dni'; }, leadM: function (n) { return n + ' mies.'; },
+      icsRenew: 'Odnów', icsExpires: 'Ważność kończy się', icsValidUntil: 'ważny do'
+    },
+    en: {
+      appName: 'Doc Tracker', title: 'Documents', addDoc: 'Add document', calAll: 'Add dates to calendar',
+      search: 'Search', searchPh: 'Search documents…',
+      headOk: 'Everything is up to date.',
+      headAttn: function (n) { return n === 1 ? '1 document needs attention' : n + ' documents need attention'; },
+      inProgress: function (n) { return 'Renewal in progress: ' + n; },
+      tExpired: 'Expired', tSoon: 'Renew soon', tOk: 'Valid',
+      allPeople: 'Everyone', general: 'General', peopleNav: 'People',
+      groupBy: 'Group', gUrgency: 'Urgency', gPerson: 'Person', gType: 'Type',
+      h_expired: 'Expired', h_soon: 'Renew soon', h_progress: 'Renewal in progress', h_ok: 'Valid', h_none: 'No expiry date',
+      tplTitle: 'Quick add',
+      tpl_passport: 'Passport', tpl_idcard: 'ID card', tpl_driving: 'Driving licence', tpl_visa: 'Visa or residence permit',
+      tpl_carins: 'Car insurance', tpl_carinsp: 'Car inspection', tpl_healthins: 'Health insurance',
+      tpl_homeins: 'Home insurance', tpl_school: 'Student ID', tpl_member: 'Membership or pass',
+      c_id: 'ID & travel', c_vehicle: 'Vehicle', c_insurance: 'Insurance', c_health: 'Health', c_home: 'Home', c_work: 'Work & school', c_other: 'Other',
+      emptyTitle: 'No documents yet',
+      emptyText: 'Add your passport, ID cards, insurance and more. You’ll get a heads-up before they expire.',
+      noMatch: 'Nothing matches your search or filters.', clearFilters: 'Clear filters',
+      newDoc: 'New document', editDoc: 'Edit document', docTitle: 'Document', docTitlePh: 'e.g. Passport',
+      owner: 'Whose is it', ownerPh: 'e.g. Ola (or leave empty)', category: 'Type',
+      expiry: 'Expiry date', noExpiry: 'No expiry date', noExpiryHint: 'For documents that never expire. No reminders are needed.',
+      issued: 'Issue date', remindersLbl: 'Remind me before it expires', remindersHint: 'Pick as many as you like.',
+      customLbl: 'Other time', unitDays: 'days', unitWeeks: 'weeks', unitMonths: 'months', addCustom: 'Add',
+      more: 'More details', number: 'Document number', location: 'Where it is kept', locationPh: 'e.g. drawer in the hall',
+      url: 'Link', urlPh: 'e.g. renewal website', notes: 'Notes', optional: ' (optional)',
+      needTitle: 'Enter a name for the document', needExpiry: 'Pick an expiry date', badUrl: 'The link should start with http:// or https://',
+      badCustom: 'Enter a number from 1 to 36 (months) or up to 365 (days)',
+      addBtn: 'Add', save: 'Save changes', cancel: 'Cancel', close: 'Close', undo: 'Undo',
+      lExpires: 'Expires', lIssued: 'Issued', lNumber: 'Number', lLocation: 'Kept at', lLink: 'Link', lNotes: 'Notes',
+      remHead: 'Reminders', before: 'before',
+      histHead: 'Earlier validity',
+      histLine: function (exp, on) { return 'Valid until ' + exp + ' (renewed ' + on + ')'; },
+      passedLbl: 'passed',
+      renewed: 'Renewed', renewStart: 'Renewal started', renewStartOff: 'Undo “renewal started”',
+      addCal: 'Add to calendar', edit: 'Edit', archive: 'Move to archive', del: 'Delete', restore: 'Restore',
+      renewTitle: function (x) { return 'Renewed: ' + x; }, renewSub: 'Enter the new expiry date.',
+      newExpiry: 'New expiry date', newNumber: 'New document number', saveRenew: 'Save',
+      archivedHead: function (n) { return 'Archived: ' + n; }, showArch: 'Show archived', hideArch: 'Hide archived',
+      st_expired: 'Expired', st_soon: 'Renew soon', st_progress: 'Renewal in progress', st_ok: 'Valid', st_none: 'No expiry',
+      tAdded: function (x) { return 'Added “' + x + '”'; }, tSaved: 'Changes saved',
+      tRenewed: function (x) { return 'Renewed “' + x + '”'; }, tArchived: function (x) { return 'Archived “' + x + '”'; },
+      tRestored: function (x) { return 'Restored “' + x + '”'; }, tDeleted: function (x) { return 'Deleted “' + x + '”'; },
+      tProgress: 'Marked: renewal started', tProgressOff: 'Reminders are back on',
+      tCal: 'Calendar file ready', tNoDates: 'No upcoming dates to add',
+      tSaveFail: 'Could not save. Storage may be full or blocked.',
+      aOpen: 'Open: ', aShow: 'Show ', aFilter: 'Filter: ',
+      settingsTitle: 'Settings', language: 'Language',
+      defTitle: 'Default reminders', defText: 'Used for every new document.',
+      calTitle: 'Calendar', calText: 'Adds every expiry date and reminder to your phone’s calendar. The calendar reminds you even when this app is closed.',
+      calBtn: 'Add everything to calendar',
+      bgTitle: 'Reminders when the app is closed', bgToggle: 'Check in the background (Chrome only)',
+      bgHint: 'Chrome checks your dates now and then in the background and may show a notification. This is not guaranteed.',
+      bgActive: 'Background checking is on.', bgNeedInstall: 'Available after installing the app from Chrome.',
+      bgUnsupported: 'This browser does not support background checking.', bgDenied: 'Background checking is blocked in your settings.',
+      notifAsk: 'Allow notifications', notifAllowed: 'Notifications are on.', notifBlocked: 'Notifications are blocked in your browser settings.',
+      notifNone: 'This browser does not support notifications.',
+      limitsTitle: 'Important',
+      limitsText: 'Web apps on Android cannot ring or notify at a set time while they are closed. The most dependable reminders are the ones in your phone’s calendar, so add your dates there.',
+      install: 'Install', installText: 'Add Doc Tracker to your home screen so it opens like a normal app.',
+      installBtn: 'Install on this phone', installed: 'Installed on this phone',
+      backup: 'Backup',
+      backupText: 'Your data lives only on this phone. Save a backup file now and then, so you can restore it if the app data is ever cleared.',
+      saveBackup: 'Save backup file', restore: 'Restore from backup file', backupDone: 'Backup file downloaded',
+      erase: 'Erase everything', eraseBtn: 'Delete all data…', eraseTitle: 'Delete all data?',
+      eraseText: 'This removes every document from this phone. Save a backup first if you may want them back.',
+      eraseGo: 'Delete everything', erased: 'All data deleted',
+      restoreTitle: 'Restore this backup?',
+      restoreText: function (n) { return 'Documents in the backup: ' + n + '. It replaces what is on this phone now.'; },
+      restoreGo: 'Replace with backup', restored: 'Backup restored',
+      badFile: 'That file is not a backup from this app.', readFail: 'Could not read that file.',
+      today: 'today', tomorrow: 'tomorrow', yesterday: 'yesterday',
+      inDays: function (n) { return 'in ' + n + ' days'; }, inMonths: function (n) { return 'in ' + n + ' months'; }, inYears: function (n) { return 'in ' + n + ' years'; },
+      agoDays: function (n) { return n + ' days ago'; }, agoMonths: function (n) { return n + ' months ago'; }, agoYears: function (n) { return n + ' years ago'; },
+      leadD: function (n) { return n === 1 ? '1 day' : n + ' days'; }, leadM: function (n) { return n === 1 ? '1 month' : n + ' months'; },
+      icsRenew: 'Renew', icsExpires: 'Expires', icsValidUntil: 'expires'
+    }
+  };
+  var TEMPLATES = [
+    { k: 'passport', cat: 'id', leads: ['6m', '3m'] }, { k: 'idcard', cat: 'id', leads: ['3m', '1m'] },
+    { k: 'driving', cat: 'id', leads: ['3m', '1m'] }, { k: 'visa', cat: 'id', leads: ['5m', '2m'] },
+    { k: 'carins', cat: 'vehicle', leads: ['1m', '14d'] }, { k: 'carinsp', cat: 'vehicle', leads: ['1m', '14d'] },
+    { k: 'healthins', cat: 'insurance', leads: ['1m'] }, { k: 'homeins', cat: 'insurance', leads: ['1m'] },
+    { k: 'school', cat: 'work', leads: ['1m'] }, { k: 'member', cat: 'other', leads: ['14d'] }
+  ];
+
+  function autoLang() { return String(navigator.language || 'en').toLowerCase().indexOf('pl') === 0 ? 'pl' : 'en'; }
+  function lang() { return state.lang || autoLang(); }
+  function t(key, a, b) {
+    var v = T[lang()][key];
+    if (v === undefined) v = T.en[key];
+    return typeof v === 'function' ? v(a, b) : v;
+  }
+  function locale() { return lang() === 'pl' ? 'pl-PL' : 'en-GB'; }
+
+  /* ---------- dates ---------- */
+  function todayISO() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function isoToDate(iso) { var p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function dateToISO(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function shiftDay(iso, delta) { var d = isoToDate(iso); d.setDate(d.getDate() + delta); return dateToISO(d); }
+  function daysBetween(a, b) { return Math.round((isoToDate(b) - isoToDate(a)) / 86400000); }
+  function addMonths(iso, n) {    // clamps the day, so 31 Aug minus 6 months is 28/29 Feb rather than early March
+    var d = isoToDate(iso), day = d.getDate();
+    var target = new Date(d.getFullYear(), d.getMonth() + n, 1);
+    var last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(day, last));
+    return dateToISO(target);
+  }
+  function fmtDate(iso) {
+    var d = isoToDate(iso);
+    return d.toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function parseLead(l) { var m = /^(\d{1,3})([dm])$/.exec(l); return m ? { n: parseInt(m[1], 10), u: m[2] } : null; }
+  function leadDays(l) { var p = parseLead(l); return p.u === 'd' ? p.n : p.n * 30.4375; }
+  function leadDate(expiry, l) { var p = parseLead(l); return p.u === 'd' ? shiftDay(expiry, -p.n) : addMonths(expiry, -p.n); }
+  function leadLabel(l) { var p = parseLead(l); return p.u === 'd' ? t('leadD', p.n) : t('leadM', p.n); }
+  function relText(days) {
+    if (days === 0) return t('today');
+    if (days === 1) return t('tomorrow');
+    if (days === -1) return t('yesterday');
+    var a = Math.abs(days), future = days > 0;
+    if (a <= 60) return future ? t('inDays', a) : t('agoDays', a);
+    var months = Math.round(a / 30.4375);
+    if (months < 24) return future ? t('inMonths', months) : t('agoMonths', months);
+    var years = Math.round(a / 365.25);
+    return future ? t('inYears', years) : t('agoYears', years);
+  }
+
+  /* ---------- data ---------- */
+  // docs: { id, title, owner, cat, number, issued, expiry, leads[], location, url, notes, progress, archived, history[{exp,on}], created }
+  function blank() { return { version: 1, lang: '', docs: [], settings: { leads: ['2m'], bg: false }, group: 'urgency' }; }
+
+  function sanitize(d) {
+    var out = blank();
+    if (!d || typeof d !== 'object') return out;
+    if (d.lang === 'pl' || d.lang === 'en') out.lang = d.lang;
+    if (d.group === 'person' || d.group === 'type') out.group = d.group;
+    var dre = /^\d{4}-\d{2}-\d{2}$/;
+    var cleanLeads = function (arr) {
+      return (Array.isArray(arr) ? arr : []).filter(function (l, i, a) { return typeof l === 'string' && parseLead(l) && a.indexOf(l) === i; })
+        .sort(function (x, y) { return leadDays(y) - leadDays(x); });
+    };
+    var s = d.settings && typeof d.settings === 'object' ? d.settings : {};
+    out.settings.leads = s.leads ? cleanLeads(s.leads) : ['2m'];
+    out.settings.bg = s.bg === true;
+    var ids = {};
+    (Array.isArray(d.docs) ? d.docs : []).forEach(function (x) {
+      if (!x || typeof x.id !== 'string' || typeof x.title !== 'string' || ids[x.id]) return;
+      ids[x.id] = true;
+      out.docs.push({
+        id: x.id, title: x.title.slice(0, 60), owner: typeof x.owner === 'string' ? x.owner.trim().slice(0, 30) : '',
+        cat: CATS.indexOf(x.cat) !== -1 ? x.cat : 'other',
+        number: typeof x.number === 'string' ? x.number.slice(0, 40) : '',
+        issued: dre.test(x.issued) ? x.issued : '', expiry: dre.test(x.expiry) ? x.expiry : '',
+        leads: cleanLeads(x.leads), location: typeof x.location === 'string' ? x.location.slice(0, 80) : '',
+        url: typeof x.url === 'string' && /^https?:\/\//i.test(x.url) ? x.url.slice(0, 300) : '',
+        notes: typeof x.notes === 'string' ? x.notes.slice(0, 500) : '',
+        progress: x.progress === true, archived: x.archived === true,
+        history: (Array.isArray(x.history) ? x.history : []).filter(function (r) { return r && dre.test(r.exp) && dre.test(r.on); }).map(function (r) { return { exp: r.exp, on: r.on }; }),
+        created: typeof x.created === 'number' ? x.created : 0
+      });
+    });
+    return out;
+  }
+
+  var state = load();
+  function load() {
+    try { var raw = localStorage.getItem(KEY); if (raw) return sanitize(JSON.parse(raw)); } catch (e) { /* fresh start */ }
+    return blank();
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { toast(t('tSaveFail')); }
+    syncMirror();
+  }
+
+  var live = todayISO();
+  var flt = { owner: '\u0000all', status: '', q: '' };   // owner: '\u0000all' = everyone, '' = no person, otherwise lower-case name
+  var showArchived = false;
+
+  function findDoc(id) { return state.docs.filter(function (d) { return d.id === id; })[0]; }
+  function activeDocs() { return state.docs.filter(function (d) { return !d.archived; }); }
+  function okey(s) { return String(s || '').trim().toLowerCase(); }
+  function ownerColor(name) {
+    var k = okey(name), n = 0;
+    for (var i = 0; i < k.length; i++) n = (n * 31 + k.charCodeAt(i)) >>> 0;
+    return COLORS[n % COLORS.length];
+  }
+  function ownerLabels() {   // key -> display name, first spelling wins
+    var map = {};
+    state.docs.forEach(function (d) { if (d.owner && !map[okey(d.owner)]) map[okey(d.owner)] = d.owner; });
+    return map;
+  }
+  function canonicalOwner(input) { var s = input.trim(); return ownerLabels()[okey(s)] || s; }
+
+  // where a document stands today
+  function statusOf(d) {
+    if (!d.expiry) return { key: 'none', days: null };
+    var days = daysBetween(live, d.expiry);
+    if (days < 0) return { key: 'expired', days: days };
+    if (d.progress) return { key: 'progress', days: days };
+    var reached = d.leads.some(function (l) { return leadDate(d.expiry, l) <= live; });
+    return { key: (reached || days <= 30) ? 'soon' : 'ok', days: days };
+  }
+  function byExpiry(a, b) {
+    if (!a.expiry !== !b.expiry) return a.expiry ? -1 : 1;
+    return (a.expiry || '').localeCompare(b.expiry || '') || a.title.localeCompare(b.title);
+  }
+  function matches(d, q) {
+    if (!q) return true;
+    var hay = [d.title, d.owner, d.number, d.notes, d.location, t('c_' + d.cat)].join(' ').toLowerCase();
+    return hay.indexOf(q.toLowerCase()) !== -1;
+  }
+  function ownerOk(d) {
+    if (flt.owner === '\u0000all') return true;
+    return okey(d.owner) === flt.owner;
+  }
+  function statusOk(d) {
+    if (!flt.status) return true;
+    var k = statusOf(d).key;
+    return flt.status === 'expired' ? k === 'expired' : flt.status === 'soon' ? (k === 'soon' || k === 'progress') : (k === 'ok' || k === 'none');
+  }
+  function attentionCount() { return activeDocs().filter(function (d) { var k = statusOf(d).key; return k === 'expired' || k === 'soon'; }).length; }
+
+  /* ---------- actions ---------- */
+  // Every change goes through here, so every change can be undone from the toast.
+  function change(message, fn) {
+    var snapshot = JSON.stringify(state);
+    fn();
+    save();
+    render();
+    toast(message, { label: t('undo'), fn: function () { state = sanitize(JSON.parse(snapshot)); save(); render(); } });
+  }
+  function docFromForm(f, base) {
+    var d = base || { id: uid(), progress: false, archived: false, history: [], created: Date.now() };
+    d.title = f.title; d.owner = f.owner; d.cat = f.cat; d.number = f.number; d.issued = f.issued; d.expiry = f.expiry;
+    d.leads = f.expiry ? f.leads.slice() : []; d.location = f.location; d.url = f.url; d.notes = f.notes;
+    return d;
+  }
+
+  /* ---------- rendering ---------- */
+  function renderHeader() {
+    $('#title').textContent = t('title');
+    $('#dateText').textContent = isoToDate(live).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  function renderSummary() {
+    var box = $('#summary');
+    box.replaceChildren();
+    var docs = activeDocs().filter(function (d) { return ownerOk(d) && matches(d, flt.q); });
+    if (!activeDocs().length) return;
+    var c = { expired: 0, soon: 0, ok: 0, progress: 0 };
+    docs.forEach(function (d) {
+      var k = statusOf(d).key;
+      if (k === 'expired') c.expired++; else if (k === 'soon') c.soon++; else if (k === 'progress') c.progress++; else c.ok++;
+    });
+    var attn = c.expired + c.soon;
+    var card = h('div', { class: 'card' },
+      h('h2', { class: attn ? 'attn' : 'good' }, attn ? t('headAttn', attn) : t('headOk')),
+      c.progress ? h('p', { class: 'note' }, t('inProgress', c.progress)) : null);
+    var tile = function (key, cls, label, n) {
+      return h('button', { class: 'tile t-' + cls, type: 'button', 'aria-pressed': flt.status === key ? 'true' : 'false', 'aria-label': t('aFilter') + label,
+        onclick: function () { flt.status = flt.status === key ? '' : key; renderSummary(); renderList(); } },
+        h('b', null, String(n)), h('span', null, label));
+    };
+    card.appendChild(h('div', { class: 'tiles' },
+      tile('expired', 'expired', t('tExpired'), c.expired), tile('soon', 'soon', t('tSoon'), c.soon + c.progress), tile('ok', 'ok', t('tOk'), c.ok)));
+    box.appendChild(card);
+  }
+
+  function renderControls() {
+    var box = $('#controls');
+    box.replaceChildren();
+    var docs = activeDocs();
+    if (!docs.length) return;
+    var search = h('input', { type: 'search', class: 'search', placeholder: t('searchPh'), 'aria-label': t('search'), value: flt.q,
+      oninput: function () { flt.q = search.value; renderSummary(); renderList(); } });
+    box.appendChild(search);
+
+    var labels = ownerLabels(), keys = Object.keys(labels).sort(function (a, b) { return labels[a].localeCompare(labels[b]); });
+    var hasGeneral = docs.some(function (d) { return !d.owner; });
+    if (keys.length) {
+      var needs = {};
+      docs.forEach(function (d) { var k = statusOf(d).key; if (k === 'expired' || k === 'soon') needs[okey(d.owner)] = true; });
+      var nav = h('nav', { class: 'kids', role: 'tablist', 'aria-label': t('peopleNav') });
+      var chip = function (key, label, color, isAll) {
+        var sel = flt.owner === key;
+        return h('button', { class: 'kidchip' + (isAll ? ' allchip' : ''), type: 'button', role: 'tab', style: '--kid:' + (color || 'var(--ink)'),
+          'aria-selected': sel ? 'true' : 'false', 'aria-label': t('aShow') + label,
+          onclick: function () { flt.owner = key; renderControls(); renderSummary(); renderList(); } },
+          isAll ? null : h('span', { class: 'avatar', style: '--kid:' + color }, Array.from(label)[0].toUpperCase()),
+          label, (!isAll && needs[key]) ? h('span', { class: 'duedot', 'aria-hidden': 'true' }) : null);
+      };
+      nav.appendChild(chip('\u0000all', t('allPeople'), null, true));
+      keys.forEach(function (k) { nav.appendChild(chip(k, labels[k], ownerColor(labels[k]), false)); });
+      if (hasGeneral) nav.appendChild(chip('', t('general'), 'var(--ring)', false));
+      box.appendChild(nav);
+    }
+    var seg = h('div', { class: 'seg3', role: 'radiogroup', 'aria-label': t('groupBy') },
+      [['urgency', t('gUrgency')], ['person', t('gPerson')], ['type', t('gType')]].map(function (o) {
+        var r = h('input', { type: 'radio', name: 'group', value: o[0], checked: state.group === o[0] });
+        r.addEventListener('change', function () { state.group = o[0]; save(); renderList(); });
+        return h('label', null, r, h('span', null, o[1]));
+      }));
+    box.appendChild(h('div', { class: 'groupby' }, h('span', null, t('groupBy')), seg));
+  }
+
+  function rowFor(d) {
+    var st = statusOf(d), tags = [];
+    if (d.owner) tags.push(h('span', { class: 'owner', style: '--kid:' + ownerColor(d.owner) }, h('i'), d.owner));
+    tags.push(h('span', { class: 'tag' }, t('c_' + d.cat)));
+    if (d.number) tags.push(h('span', { class: 'tag' }, d.number));
+    var side = h('div', { class: 'side' },
+      h('div', { class: 'rel' }, st.days === null ? t('st_none') : relText(st.days)),
+      d.expiry ? h('div', { class: 'dt' }, fmtDate(d.expiry)) : null,
+      st.key === 'progress' ? h('div', { class: 'badge' }, t('st_progress')) : null);
+    return h('li', { class: 'row st-' + st.key },
+      h('button', { class: 'rowbtn', type: 'button', 'aria-label': t('aOpen') + d.title, onclick: function () { detailSheet(d.id); } },
+        h('div', null, h('div', { class: 'name' }, d.title), h('div', { class: 'tags' }, tags)), side));
+  }
+
+  function groupsFor(list) {
+    var groups = [];
+    if (state.group === 'person') {
+      var labels = ownerLabels(), map = {};
+      list.forEach(function (d) { var k = okey(d.owner); (map[k] = map[k] || []).push(d); });
+      Object.keys(map).filter(function (k) { return k !== ''; }).sort(function (a, b) { return labels[a].localeCompare(labels[b]); })
+        .forEach(function (k) { groups.push({ head: labels[k], items: map[k] }); });
+      if (map['']) groups.push({ head: t('general'), items: map[''] });
+    } else if (state.group === 'type') {
+      CATS.forEach(function (c) { var g = list.filter(function (d) { return d.cat === c; }); if (g.length) groups.push({ head: t('c_' + c), items: g }); });
+    } else {
+      STATUS_ORDER.forEach(function (k) { var g = list.filter(function (d) { return statusOf(d).key === k; }); if (g.length) groups.push({ head: t('h_' + k), cls: 'g-' + k, items: g }); });
+    }
+    return groups;
+  }
+
+  function renderList() {
+    var box = $('#list');
+    box.replaceChildren();
+    var all = activeDocs();
+    if (!all.length) {
+      box.appendChild(h('div', { class: 'empty' }, h('h2', null, t('emptyTitle')), h('p', null, t('emptyText')),
+        h('div', { class: 'chips' }, TEMPLATES.slice(0, 5).map(function (tp) {
+          return h('button', { class: 'chip', type: 'button', onclick: function () { docSheet(null, tp); } }, t('tpl_' + tp.k));
+        }))));
+      return;
+    }
+    var list = all.filter(function (d) { return ownerOk(d) && statusOk(d) && matches(d, flt.q); }).sort(byExpiry);
+    if (!list.length) {
+      box.appendChild(h('div', { class: 'empty' }, h('p', null, t('noMatch')),
+        h('button', { class: 'btn ghost', type: 'button', onclick: function () { flt.owner = '\u0000all'; flt.status = ''; flt.q = ''; render(); } }, t('clearFilters'))));
+      return;
+    }
+    groupsFor(list).forEach(function (g) {
+      box.appendChild(h('div', { class: 'grouphead ' + (g.cls || '') }, g.head, h('span', null, String(g.items.length))));
+      box.appendChild(h('ul', { class: 'group' }, g.items.map(rowFor)));
+    });
+  }
+
+  function renderArchived() {
+    var box = $('#archived');
+    box.replaceChildren();
+    var arch = state.docs.filter(function (d) { return d.archived; }).sort(byExpiry);
+    if (!arch.length) return;
+    box.appendChild(h('button', { class: 'linkbtn', type: 'button', onclick: function () { showArchived = !showArchived; renderArchived(); } },
+      (showArchived ? t('hideArch') : t('showArch')) + ' (' + arch.length + ')'));
+    if (showArchived) box.appendChild(h('ul', { class: 'group', style: 'margin-top:8px' }, arch.map(rowFor)));
+  }
+
+  function render() {
+    renderHeader();
+    renderSummary();
+    renderControls();
+    renderList();
+    renderArchived();
+    $('#addBtn').hidden = false;
+    try { if (navigator.setAppBadge) { var n = attentionCount(); if (n) navigator.setAppBadge(n); else navigator.clearAppBadge(); } } catch (e) { /* not supported */ }
+  }
+
+  function applyLang() {
+    document.documentElement.lang = lang();
+    document.title = t('appName');
+    $('#settingsBtn').setAttribute('aria-label', t('settingsTitle'));
+    $('#calBtn').setAttribute('aria-label', t('calAll'));
+    $('#addBtn').innerHTML = ICON.plus;
+    $('#addBtn').appendChild(h('span', null, t('addDoc')));
+  }
+
+  /* ---------- toast ---------- */
+  var toastTimer = null;
+  function toast(message, action) {
+    var root = $('#toastRoot');
+    clearTimeout(toastTimer);
+    root.replaceChildren();
+    var el = h('div', { class: 'toast', role: 'status' }, h('span', null, message));
+    if (action) {
+      el.appendChild(h('button', { type: 'button', onclick: function () {
+        clearTimeout(toastTimer); root.replaceChildren(); action.fn();
+      } }, action.label));
+    }
+    root.appendChild(el);
+    toastTimer = setTimeout(function () { root.replaceChildren(); }, action ? 6000 : 3500);
+  }
+
+  /* ---------- sheets (bottom dialogs) ---------- */
+  var sheetEl = null, sheetHistory = false;
+  function openSheet(title, sub, nodes, focusFirst) {
+    var content = [h('div', { class: 'grab' }), h('h2', null, title), sub ? h('p', { class: 'sub2' }, sub) : null, nodes];
+    if (sheetEl) {                       // swap content in place
+      var sheet = sheetEl.firstChild;
+      sheet.replaceChildren.apply(sheet, content.filter(Boolean).flat());
+      sheet.scrollTop = 0;
+      return;
+    }
+    clearTimeout(toastTimer); $('#toastRoot').replaceChildren();
+    var box = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
+    append(box, content);
+    sheetEl = h('div', { class: 'scrim', onclick: function (e) { if (e.target === sheetEl) closeSheet(); } }, box);
+    $('#sheetRoot').appendChild(sheetEl);
+    // Lets the Android back button close the sheet instead of leaving the app.
+    try { history.pushState({ sheet: 1 }, ''); sheetHistory = true; } catch (e) { sheetHistory = false; }
+    if (focusFirst) { var first = box.querySelector('input[type=text]'); if (first) first.focus(); }
+  }
+  function removeSheetEl() { if (sheetEl) { sheetEl.remove(); sheetEl = null; } }
+  function closeSheet() {
+    if (!sheetEl) return;
+    if (sheetHistory) { sheetHistory = false; history.back(); }
+    else removeSheetEl();
+  }
+  window.addEventListener('popstate', removeSheetEl);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+
+  function field(label, input, optional) {
+    return h('label', { class: 'field' }, h('span', { class: 'lbl' }, label, optional ? h('span', { class: 'opt' }, t('optional')) : null), input);
+  }
+  function button(cls, label, onclick, type, sub) {
+    return h('button', { class: 'btn ' + cls, type: type || 'button', onclick: onclick }, label, sub ? h('small', null, sub) : null);
+  }
+  function segmented(name, options, current, extraClass, onchange) {
+    var wrap = h('div', { class: 'seg3' + (extraClass ? ' ' + extraClass : ''), role: 'radiogroup' });
+    options.forEach(function (o) {
+      var r = h('input', { type: 'radio', name: name, value: o.value, checked: o.value === current });
+      if (onchange) r.addEventListener('change', function () { onchange(o.value); });
+      wrap.appendChild(h('label', null, r, h('span', null, o.label)));
+    });
+    return wrap;
+  }
+  function segValue(wrap) { var r = wrap.querySelector('input:checked'); return r ? r.value : null; }
+
+  // reminder times as toggle chips, plus a small "other time" form (used in the document form and in Settings)
+  var pickerId = 0;
+  function leadPicker(initial, onChange) {
+    var sel = initial.slice(), chips = h('div', { class: 'pickchips' }), uidn = 'cu' + (++pickerId);
+    function changed() { if (onChange) onChange(sel.slice()); }
+    function draw() {
+      chips.replaceChildren();
+      var all = PRESET_LEADS.slice();
+      sel.forEach(function (l) { if (all.indexOf(l) === -1) all.push(l); });
+      all.sort(function (a, b) { return leadDays(a) - leadDays(b); });
+      all.forEach(function (l) {
+        var i = h('input', { type: 'checkbox', value: l, checked: sel.indexOf(l) !== -1 });
+        i.addEventListener('change', function () {
+          if (i.checked) { if (sel.indexOf(l) === -1) sel.push(l); } else sel = sel.filter(function (x) { return x !== l; });
+          changed();
+        });
+        chips.appendChild(h('label', { class: 'pickchip' }, i, h('span', null, leadLabel(l))));
+      });
+    }
+    var numI = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '365', step: '1', placeholder: '10', 'aria-label': t('customLbl') });
+    var unit = segmented(uidn, [{ value: 'd', label: t('unitDays') }, { value: 'w', label: t('unitWeeks') }, { value: 'm', label: t('unitMonths') }], 'd');
+    var addBtn = button('ghost', t('addCustom'), function () {
+      var n = parseInt(numI.value, 10), u = segValue(unit), lead;
+      if (u === 'm') lead = (n >= 1 && n <= 36) ? n + 'm' : null;
+      else { var days = u === 'w' ? n * 7 : n; lead = (n >= 1 && days <= 365) ? days + 'd' : null; }
+      if (!lead) { toast(t('badCustom')); numI.focus(); return; }
+      if (sel.indexOf(lead) === -1) sel.push(lead);
+      numI.value = ''; draw(); changed();
+    });
+    draw();
+    var node = h('div', null, chips, h('div', { class: 'field', style: 'margin-top:12px;margin-bottom:0' }, h('span', { class: 'lbl' }, t('customLbl')),
+      h('div', { class: 'customrow', style: 'margin-top:0' }, numI, unit, addBtn)));
+    return { node: node, get: function () { return sel.slice().sort(function (a, b) { return leadDays(b) - leadDays(a); }); } };
+  }
+
+  /* ---------- add / edit form ---------- */
+  function docSheet(existing, tpl) {
+    var editing = !!existing;
+    var titleI = h('input', { type: 'text', required: true, maxlength: '60', placeholder: t('docTitlePh'), autocomplete: 'off', autocapitalize: 'sentences',
+      value: editing ? existing.title : (tpl ? t('tpl_' + tpl.k) : '') });
+    var labels = ownerLabels();
+    var ownerI = h('input', { type: 'text', maxlength: '30', placeholder: t('ownerPh'), autocomplete: 'off', autocapitalize: 'words', list: 'ownerlist',
+      value: editing ? existing.owner : (flt.owner !== '\u0000all' && flt.owner ? labels[flt.owner] || '' : '') });
+    var ownerList = h('datalist', { id: 'ownerlist' }, Object.keys(labels).map(function (k) { return h('option', { value: labels[k] }); }));
+    var curCat = editing ? existing.cat : (tpl ? tpl.cat : 'other');
+    var catBox = h('div', { class: 'pickchips' }, CATS.map(function (c) {
+      return h('label', { class: 'pickchip' }, h('input', { type: 'radio', name: 'cat', value: c, checked: c === curCat }), h('span', null, t('c_' + c)));
+    }));
+    var noExp = h('input', { type: 'checkbox', class: 'switch', role: 'switch', checked: editing && !existing.expiry });
+    var expI = h('input', { type: 'date', value: editing ? existing.expiry : '' });
+    var issI = h('input', { type: 'date', value: editing ? existing.issued : '' });
+    var picker = leadPicker(editing ? existing.leads : (tpl ? tpl.leads : state.settings.leads));
+    var dateBox = h('div', null,
+      field(t('expiry'), expI),
+      h('div', { class: 'field' }, h('span', { class: 'lbl' }, t('remindersLbl')), h('p', { class: 'hint' }, t('remindersHint')), picker.node));
+    noExp.addEventListener('change', function () { dateBox.hidden = noExp.checked; });
+    dateBox.hidden = noExp.checked;
+    var numberI = h('input', { type: 'text', maxlength: '40', autocomplete: 'off', value: editing ? existing.number : '' });
+    var locI = h('input', { type: 'text', maxlength: '80', placeholder: t('locationPh'), autocomplete: 'off', value: editing ? existing.location : '' });
+    var urlI = h('input', { type: 'url', inputmode: 'url', maxlength: '300', placeholder: t('urlPh'), autocomplete: 'off', value: editing ? existing.url : '' });
+    var notesI = h('textarea', { maxlength: '500' });
+    notesI.value = editing ? existing.notes : '';
+
+    var tplRow = null;
+    if (!editing) {
+      tplRow = h('div', { class: 'field' }, h('span', { class: 'lbl' }, t('tplTitle')),
+        h('div', { class: 'tplrow' }, TEMPLATES.map(function (tp) {
+          return h('button', { class: 'chip', type: 'button', onclick: function () {
+            titleI.value = t('tpl_' + tp.k);
+            var r = catBox.querySelector('input[value="' + tp.cat + '"]'); if (r) r.checked = true;
+            // swap in the template's reminders
+            var np = leadPicker(tp.leads); picker.node.replaceWith(np.node); picker = np; titleI.focus();
+          } }, t('tpl_' + tp.k));
+        })));
+    }
+
+    var form = h('form', { onsubmit: function (e) {
+      e.preventDefault();
+      var title = titleI.value.trim();
+      if (!title) { toast(t('needTitle')); titleI.focus(); return; }
+      var expiry = noExp.checked ? '' : expI.value;
+      if (!noExp.checked && !expiry) { toast(t('needExpiry')); expI.focus(); return; }
+      var url = urlI.value.trim();
+      if (url && !/^https?:\/\//i.test(url)) { toast(t('badUrl')); urlI.focus(); return; }
+      var cat = catBox.querySelector('input:checked');
+      var f = { title: title, owner: canonicalOwner(ownerI.value), cat: cat ? cat.value : 'other', number: numberI.value.trim(), issued: issI.value,
+        expiry: expiry, leads: picker.get(), location: locI.value.trim(), url: url, notes: notesI.value.trim() };
+      if (editing) { docFromForm(f, existing); save(); render(); closeSheet(); toast(t('tSaved')); }
+      else { var d = docFromForm(f); state.docs.push(d); save(); render(); closeSheet(); toast(t('tAdded', title)); }
+    } },
+      tplRow,
+      field(t('docTitle'), titleI),
+      h('div', { class: 'field' }, h('span', { class: 'lbl' }, t('owner'), h('span', { class: 'opt' }, t('optional'))), ownerI, ownerList),
+      h('div', { class: 'field' }, h('span', { class: 'lbl' }, t('category')), catBox),
+      h('label', { class: 'switchrow' }, h('span', null, h('b', null, t('noExpiry')), h('small', null, t('noExpiryHint'))), noExp),
+      dateBox,
+      h('details', null, h('summary', null, t('more')),
+        field(t('issued'), issI, true), field(t('number'), numberI, true), field(t('location'), locI, true),
+        field(t('url'), urlI, true), field(t('notes'), notesI, true)),
+      h('div', { class: 'btnrow' },
+        button('primary', editing ? t('save') : t('addBtn'), null, 'submit'),
+        button('ghost', t('cancel'), closeSheet)));
+    openSheet(editing ? t('editDoc') : t('newDoc'), null, [form], !editing);
+  }
+
+  /* ---------- detail ---------- */
+  function detailSheet(id) {
+    var d = findDoc(id);
+    if (!d) return;
+    var st = statusOf(d);
+    var kv = [];
+    var row = function (k, v) { if (v) kv.push(h('div', null, h('dt', null, k), h('dd', null, v))); };
+    row(t('lExpires'), d.expiry ? fmtDate(d.expiry) + ' (' + relText(st.days) + ')' : t('st_none'));
+    row(t('lIssued'), d.issued ? fmtDate(d.issued) : '');
+    row(t('lNumber'), d.number);
+    row(t('lLocation'), d.location);
+    if (d.url) row(t('lLink'), h('a', { href: d.url, target: '_blank', rel: 'noopener noreferrer' }, d.url));
+    row(t('lNotes'), d.notes);
+
+    var nodes = [
+      h('span', { class: 'pillst st-' + st.key }, t('st_' + st.key)),
+      h('dl', { class: 'kv' }, kv)
+    ];
+    if (d.expiry && d.leads.length) {
+      nodes.push(h('div', { class: 'section' }, h('h3', null, t('remHead')),
+        h('ul', { class: 'rlist' }, d.leads.map(function (l) {
+          var date = leadDate(d.expiry, l), past = date <= live;
+          return h('li', { class: past ? 'past' : '' }, h('span', null, leadLabel(l) + ' ' + t('before')), h('span', null, fmtDate(date), past ? h('b', null, ' ✓') : null));
+        }))));
+    }
+    if (d.history.length) {
+      nodes.push(h('div', { class: 'section' }, h('h3', null, t('histHead')),
+        h('ul', { class: 'rlist' }, d.history.slice().reverse().map(function (r) { return h('li', null, h('span', null, t('histLine', fmtDate(r.exp), fmtDate(r.on)))); }))));
+    }
+    var btns = [];
+    if (!d.archived) {
+      if (d.expiry) btns.push(button('primary', t('renewed'), function () { renewSheet(d.id); }));
+      if (d.expiry && st.key !== 'expired') {
+        btns.push(button('ghost', d.progress ? t('renewStartOff') : t('renewStart'), function () {
+          closeSheet(); change(d.progress ? t('tProgressOff') : t('tProgress'), function () { d.progress = !d.progress; });
+        }));
+      }
+      if (d.expiry) btns.push(button('ghost', t('addCal'), function () { exportCalendar([d]); }));
+      btns.push(button('ghost', t('edit'), function () { docSheet(d); }));
+      btns.push(button('ghost', t('archive'), function () { closeSheet(); change(t('tArchived', d.title), function () { d.archived = true; }); }));
+    } else {
+      btns.push(button('primary', t('restore'), function () { closeSheet(); change(t('tRestored', d.title), function () { d.archived = false; }); }));
+    }
+    nodes.push(h('div', { class: 'btnrow detailbtns' }, btns));
+    nodes.push(h('div', { class: 'extras' }, h('button', { class: 'textbtn dangertext', type: 'button', onclick: function () {
+      closeSheet(); change(t('tDeleted', d.title), function () { state.docs = state.docs.filter(function (x) { return x.id !== d.id; }); });
+    } }, t('del'))));
+    openSheet(d.title, [d.owner, t('c_' + d.cat)].filter(Boolean).join(', '), nodes);
+  }
+
+  function renewSheet(id) {
+    var d = findDoc(id);
+    // suggest the same validity length as last time, when the issue date is known
+    var suggest = '';
+    if (d.issued && d.expiry && d.issued < d.expiry) suggest = shiftDay(d.expiry, daysBetween(d.issued, d.expiry));
+    var expI = h('input', { type: 'date', required: true, value: suggest });
+    var numI = h('input', { type: 'text', maxlength: '40', autocomplete: 'off', value: d.number });
+    var form = h('form', { onsubmit: function (e) {
+      e.preventDefault();
+      if (!expI.value) { expI.focus(); return; }
+      var newExp = expI.value, num = numI.value.trim();
+      closeSheet();
+      change(t('tRenewed', d.title), function () {
+        d.history.push({ exp: d.expiry, on: live });
+        d.issued = live; d.expiry = newExp; d.number = num; d.progress = false;
+      });
+    } },
+      field(t('newExpiry'), expI), field(t('newNumber'), numI, true),
+      h('div', { class: 'btnrow' }, button('primary', t('saveRenew'), null, 'submit'), button('ghost', t('cancel'), closeSheet)));
+    openSheet(t('renewTitle', d.title), t('renewSub'), [form]);
+  }
+
+  /* ---------- calendar export (.ics) ---------- */
+  function icsEscape(s) { return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+  function icsFold(line) {    // lines longer than 75 bytes must be folded
+    var enc = new TextEncoder(), out = [], cur = '', bytes = 0;
+    Array.from(line).forEach(function (ch) {
+      var b = enc.encode(ch).length;
+      if (bytes + b > (out.length ? 72 : 74)) { out.push(cur); cur = ch; bytes = b; } else { cur += ch; bytes += b; }
+    });
+    out.push(cur);
+    return out.join('\r\n ');
+  }
+  function icsDate(iso) { return iso.replace(/-/g, ''); }
+  function buildIcs(docs) {
+    var stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Doc Tracker//EN', 'CALSCALE:GREGORIAN'], count = 0;
+    var event = function (uidText, date, summary, desc) {
+      count++;
+      lines.push('BEGIN:VEVENT', 'UID:' + uidText + '@doc-tracker', 'DTSTAMP:' + stamp,
+        'DTSTART;VALUE=DATE:' + icsDate(date), 'DTEND;VALUE=DATE:' + icsDate(shiftDay(date, 1)),
+        'SUMMARY:' + icsEscape(summary), 'DESCRIPTION:' + icsEscape(desc), 'TRANSP:TRANSPARENT',
+        'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEscape(summary), 'TRIGGER:PT9H', 'END:VALARM', 'END:VEVENT');
+    };
+    docs.forEach(function (d) {
+      if (!d.expiry || d.archived) return;
+      var who = d.owner ? ' (' + d.owner + ')' : '', name = d.title + who;
+      var info = [d.number ? t('lNumber') + ': ' + d.number : '', d.location ? t('lLocation') + ': ' + d.location : '', d.url ? d.url : '', d.notes].filter(Boolean).join('\n');
+      d.leads.forEach(function (l) {
+        var date = leadDate(d.expiry, l);
+        if (date >= live && date <= d.expiry) event(d.id + '-' + l, date, t('icsRenew') + ': ' + name + ', ' + t('icsValidUntil') + ' ' + fmtDate(d.expiry), info);
+      });
+      if (d.expiry >= live) event(d.id + '-exp', d.expiry, t('icsExpires') + ': ' + name, info);
+    });
+    lines.push('END:VCALENDAR');
+    return { text: lines.map(icsFold).join('\r\n') + '\r\n', count: count };
+  }
+  function deliverFile(name, mime, text) {
+    var download = function () {
+      var url = URL.createObjectURL(new Blob([text], { type: mime }));
+      var a = h('a', { href: url, download: name });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+    };
+    var file = null;
+    try { file = new File([text], name, { type: mime }); } catch (e) { file = null; }
+    if (file && navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: name }).catch(function (err) { if (!err || err.name !== 'AbortError') download(); });
+    } else download();
+  }
+  function exportCalendar(docs) {
+    var r = buildIcs(docs);
+    if (!r.count) { toast(t('tNoDates')); return; }
+    deliverFile('documents.ics', 'text/calendar', r.text);
+    toast(t('tCal'));
+  }
+
+  /* ---------- background reminders (best effort) ---------- */
+  // The page keeps a copy of the reminder schedule in IndexedDB; the service worker reads it when Chrome wakes it up.
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      var r = indexedDB.open('docTracker', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('kv'); };
+      r.onsuccess = function () { resolve(r.result); };
+      r.onerror = function () { reject(r.error); };
+    });
+  }
+  function idbGet(key) {
+    return idbOpen().then(function (db) { return new Promise(function (resolve, reject) { var q = db.transaction('kv').objectStore('kv').get(key); q.onsuccess = function () { resolve(q.result); }; q.onerror = function () { reject(q.error); }; }); });
+  }
+  function idbSet(key, value) {
+    return idbOpen().then(function (db) { return new Promise(function (resolve, reject) { var tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(value, key); tx.oncomplete = function () { resolve(); }; tx.onerror = function () { reject(tx.error); }; }); });
+  }
+  function computeDue(m, today) {   // same rules as the service worker
+    var out = [];
+    ((m && m.items) || []).forEach(function (it) {
+      (it.dates || []).forEach(function (dt) { if (dt <= today && today <= it.expiry) out.push({ key: it.id + '|' + dt, it: it, kind: 'remind' }); });
+      if (it.expiry < today && daysBetween(it.expiry, today) <= 30) out.push({ key: it.id + '|exp', it: it, kind: 'expired' });
+    });
+    return out;
+  }
+  var mirrorTimer = null;
+  function syncMirror() { clearTimeout(mirrorTimer); mirrorTimer = setTimeout(doMirror, 400); }
+  function doMirror() {
+    if (!window.indexedDB) return;
+    var items = activeDocs().filter(function (d) { return d.expiry && !d.progress; }).map(function (d) {
+      return { id: d.id, title: d.title, owner: d.owner, expiry: d.expiry, dates: d.leads.map(function (l) { return leadDate(d.expiry, l); }) };
+    });
+    idbGet('mirror').then(function (old) {
+      var shown = (old && old.shown) || {};
+      // anything you can see in the app right now counts as already shown
+      if (document.visibilityState === 'visible') computeDue({ items: items }, live).forEach(function (x) { shown[x.key] = true; });
+      return idbSet('mirror', { lang: lang(), items: items, shown: shown });
+    }).catch(function () { /* IndexedDB unavailable: reminders in the app still work */ });
+  }
+  function setupBackground() {
+    if (!state.settings.bg || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      if (!('periodicSync' in reg)) return;
+      return reg.periodicSync.register('doc-reminders', { minInterval: 12 * 3600 * 1000 });
+    }).catch(function () { /* not allowed here */ });
+  }
+  function bgStatus(node) {
+    var set = function (k) { node.textContent = t(k); };
+    if (!('serviceWorker' in navigator) || !('PeriodicSyncManager' in window)) { set('bgUnsupported'); return; }
+    if (!state.settings.bg) { node.textContent = ''; return; }
+    if (!navigator.permissions) { set('bgNeedInstall'); return; }
+    navigator.permissions.query({ name: 'periodic-background-sync' }).then(function (p) {
+      if (p.state === 'granted') set('bgActive'); else if (p.state === 'denied') set('bgDenied'); else set('bgNeedInstall');
+    }).catch(function () { set('bgNeedInstall'); });
+  }
+
+  /* ---------- settings ---------- */
+  var deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; });
+  window.addEventListener('appinstalled', function () { deferredInstall = null; toast(t('installed')); });
+
+  function settingsSheet() {
+    var langSeg = segmented('lang', [{ value: 'pl', label: 'Polski' }, { value: 'en', label: 'English' }], lang(), 'two', function (v) {
+      state.lang = v; save(); applyLang(); render(); settingsSheet();
+    });
+    var defPicker = leadPicker(state.settings.leads, function (arr) { state.settings.leads = arr.sort(function (a, b) { return leadDays(b) - leadDays(a); }); save(); });
+    var bgI = h('input', { type: 'checkbox', class: 'switch', role: 'switch', checked: state.settings.bg, onchange: function () {
+      state.settings.bg = bgI.checked; save(); setupBackground(); bgStatus(bgNote);
+    } });
+    var bgNote = h('p', { style: 'margin-top:6px' });
+    bgStatus(bgNote);
+    var notifState = typeof Notification === 'undefined' ? 'none' : Notification.permission;
+    var notifNode = notifState === 'granted' ? h('p', null, t('notifAllowed'))
+      : notifState === 'denied' ? h('p', null, t('notifBlocked'))
+      : notifState === 'none' ? h('p', null, t('notifNone'))
+      : button('ghost', t('notifAsk'), function () { Notification.requestPermission().then(function () { settingsSheet(); }); });
+    var fileI = h('input', { type: 'file', accept: 'application/json,.json', class: 'vis', tabindex: '-1', 'aria-hidden': 'true',
+      onchange: function () { importFile(fileI.files[0]); fileI.value = ''; } });
+
+    openSheet(t('settingsTitle'), null, [
+      h('div', { class: 'field' }, h('span', { class: 'lbl' }, t('language')), langSeg),
+      h('div', { class: 'section' }, h('h3', null, t('defTitle')), h('p', null, t('defText')), defPicker.node),
+      h('div', { class: 'section' }, h('h3', null, t('calTitle')), h('p', null, t('calText')),
+        button('primary', t('calBtn'), function () { exportCalendar(state.docs); })),
+      h('div', { class: 'section' }, h('h3', null, t('bgTitle')),
+        h('label', { class: 'switchrow' }, h('span', null, h('b', null, t('bgToggle')), h('small', null, t('bgHint'))), bgI), bgNote,
+        notifNode,
+        h('div', { class: 'notice', style: 'margin-top:12px' }, h('b', null, t('limitsTitle')), t('limitsText'))),
+      deferredInstall ? h('div', { class: 'section' }, h('h3', null, t('install')), h('p', null, t('installText')),
+        button('primary', t('installBtn'), function () { var ev = deferredInstall; deferredInstall = null; closeSheet(); ev.prompt(); })) : null,
+      h('div', { class: 'section' }, h('h3', null, t('backup')), h('p', null, t('backupText')),
+        h('div', { class: 'btnrow' }, button('ghost', t('saveBackup'), exportData), button('ghost', t('restore'), function () { fileI.click(); }), fileI)),
+      h('div', { class: 'section' }, h('h3', null, t('erase')), button('danger', t('eraseBtn'), eraseSheet)),
+      h('div', { class: 'btnrow', style: 'margin-top:22px' }, button('ghost', t('close'), closeSheet))
+    ]);
+  }
+
+  function eraseSheet() {
+    openSheet(t('eraseTitle'), t('eraseText'), [
+      h('div', { class: 'btnrow' },
+        button('danger', t('eraseGo'), function () {
+          var keepLang = state.lang; state = blank(); state.lang = keepLang; save(); flt = { owner: '\u0000all', status: '', q: '' }; closeSheet(); render(); toast(t('erased'));
+        }),
+        button('ghost', t('cancel'), closeSheet))
+    ]);
+  }
+
+  function exportData() {
+    var payload = Object.assign({ app: 'docTracker' }, state);
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = h('a', { href: url, download: 'doc-tracker-backup-' + todayISO() + '.json' });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+    toast(t('backupDone'));
+  }
+
+  function importFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data = null;
+      try {
+        var parsed = JSON.parse(reader.result);
+        if (parsed && parsed.app === 'docTracker' && Array.isArray(parsed.docs)) data = sanitize(parsed);
+      } catch (e) { data = null; }
+      if (!data) { toast(t('badFile')); return; }
+      openSheet(t('restoreTitle'), t('restoreText', data.docs.length), [
+        h('div', { class: 'btnrow' },
+          button('primary', t('restoreGo'), function () {
+            state = data; save(); flt = { owner: '\u0000all', status: '', q: '' }; closeSheet(); applyLang(); render(); setupBackground(); toast(t('restored'));
+          }),
+          button('ghost', t('cancel'), closeSheet))
+      ]);
+    };
+    reader.onerror = function () { toast(t('readFail')); };
+    reader.readAsText(file);
+  }
+
+  /* ---------- wiring ---------- */
+  $('#settingsBtn').innerHTML = ICON.tune;
+  $('#calBtn').innerHTML = ICON.cal;
+  $('#addBtn').addEventListener('click', function () { docSheet(null); });
+  $('#settingsBtn').addEventListener('click', settingsSheet);
+  $('#calBtn').addEventListener('click', function () { exportCalendar(state.docs); });
+
+  // A new day changes what is "due" and what has expired.
+  function checkNewDay() {
+    var now = todayISO();
+    if (now === live) return;
+    live = now;
+    render(); syncMirror();
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { checkNewDay(); syncMirror(); } });
+  setInterval(checkNewDay, 60000);
+
+  if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () {}); }
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+
+  applyLang();
+  render();
+  syncMirror();
+  setupBackground();
+})();
+</script>
+</body>
+</html>
