@@ -1,6 +1,6 @@
 {
   "name": "Doc Tracker",
-  "short_name": "Doc Tracker",
+  "short_name": "docTracker",
   "description": "Track documents and their expiry dates, with reminders before they run out. / Dokumenty i terminy ważności z przypomnieniami.",
   "id": "./",
   "start_url": "./",
